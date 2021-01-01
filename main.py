@@ -12,7 +12,7 @@ def get_parser():
     basic_parser.add_argument('--q_len', type=int, default=200)
     basic_parser.add_argument('--a_len', type=int, default=200)
     basic_parser.add_argument('--test', type=str, default='test1')
-    basic_parser.add_argument('--embedding_fn', type=str, default='./data/glove-wiki-gigaword-300')
+    basic_parser.add_argument('--embedding_fn', type=str, default='./data/glove-wiki-gigaword-50')
     basic_parser.add_argument('--vocab_fn', type=str, default='./data/insuranceQA/V1/vocabulary')
     basic_parser.add_argument('--embedding_dim', type=int, default=100)
     basic_parser.add_argument('--model_name', type=str, default='qa-lstm')
@@ -32,8 +32,9 @@ def get_parser():
     basic_parser.add_argument('--n_layers', type=int, default=1)
 
     # cnn_parser = argparse.ArgumentParser(parents=[basic_parser])
-    basic_parser.add_argument('--filter_size', type=int)
-    basic_parser.add_argument('--n_filter', type=int)
+    basic_parser.add_argument('--filter_size', type=int, default=3)
+    basic_parser.add_argument('--n_filter', type=int, default=5)
+    basic_parser.add_argument('--padding', type=int, default=1)
 
     return basic_parser
 

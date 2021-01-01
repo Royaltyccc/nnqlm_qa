@@ -5,8 +5,6 @@ from utils import *
 
 warnings.filterwarnings("ignore")
 
-device = "cuda" if torch.cuda.is_available() else "cpu"
-
 
 def train_sim(opts):
     ID = Field(sequential=False, use_vocab=False, dtype=torch.float)
@@ -82,7 +80,7 @@ def train_sim(opts):
         p.get_train_data().to_csv(join(p.path_dir, 'train.tsv'), index=False, sep='\t')
         train = TabularDataset(path=join('./data/', opts.dataset_fn, 'train.tsv'), format='tsv',
                                skip_header=True, fields=fields)
-        train_iter = BucketIterator(train, batch_size=opts.batch_size, device=device, shuffle=True, sort=False)
+        train_iter = BucketIterator(train, batch_size=opts.batch_size, device=opts.device, shuffle=True, sort=False)
         print("rebuilding train dataset done")
 
         for idx, batch in enumerate(tqdm(train_iter)):
@@ -199,17 +197,15 @@ def train_class(opts):
     train_iter, test_iter = BucketIterator.splits(
         (train, test),
         batch_sizes=(opts.batch_size, opts.batch_size),
-        device=torch.device(device),
+        device=torch.device(opts.device),
         sort_key=lambda x: len(x.question),
         sort_within_batch=True
     )
-
     print("building dataset and iterator: done")
 
     print("building word vectors: starting")
-    # if os.path.exists()
     glove_vectors = KeyedVectors.load(opts.embedding_fn) if os.path.exists(opts.embedding_fn) \
-        else gensim.downloader.load('glove-wiki-gigaword-300')
+        else gensim.downloader.load(opts.embedding_fn)
     stoi = {word: idx for idx, word in enumerate(glove_vectors.index2word)}
     i2v = [torch.from_numpy(glove_vectors[word].copy()) for idx, word in enumerate(glove_vectors.index2word)]
 
@@ -243,7 +239,20 @@ def train_class(opts):
         test_score = []
 
         model.train()
+        is_first_batch = True
         for idx, batch in enumerate(tqdm(train_iter)):
+            if idx < 1270 and opts.dataset_fn == 'wiki':
+                continue
+            elif idx < 6600 and opts.dataset_fn == 'trec':
+                continue
+            if is_first_batch:
+                first_batch = batch
+                is_first_batch = False
+                if first_batch.batch_size != opts.batch_size:
+                    continue
+            if batch.batch_size != opts.batch_size:
+                batch = fill_last_batch(first_batch, batch)
+
             score = model(batch.question, batch.answer)
             pred = torch.argmax(score, dim=1)
             train_loss = criterion(score, batch.label)
@@ -268,40 +277,51 @@ def train_class(opts):
         train_roc = metrics.roc_auc_score(train_record['label'], train_record['score'])
         train_map, train_mrr = calculate_map_mrr(train_record, sort_by='score')
 
-        model.eval()
-        for idx, batch in enumerate(tqdm(test_iter)):
-            score = model(batch.question, batch.answer)
-            pred = torch.argmax(score, dim=1)
-            test_loss = criterion(score, batch.label)
-            test_loss_in_epoch.append(test_loss.item())
-
-            test_qid.extend(batch.qid.cpu().tolist())
-            test_aid.extend(batch.aid.cpu().tolist())
-            test_label.extend(batch.label.cpu().tolist())
-            test_pred.extend(pred.cpu().tolist())
-            test_score.extend(score[:, 1].cpu().tolist())
-
-        test_record = pd.DataFrame({"qid": test_qid,
-                                    "aid": test_aid,
-                                    "label": test_label,
-                                    "score": test_score,
-                                    "pred": test_pred})
-
-        test_roc = metrics.roc_auc_score(train_record['label'], train_record['score'])
-        test_map, test_mrr = calculate_map_mrr(test_record, sort_by='score')
-
-        print("epoch: {} \t train loss:{} \t test loss:{} \n"
-              "\t \t \t train roc:{} \t test roc: {} \n"
-              "\t \t \t train mrr:{} \t test mrr:{}\n"
-              "\t \t \t train map:{} \t test map:{}".format(i,
-                                                            sum(train_loss_in_epoch) / len(train_loss_in_epoch),
-                                                            sum(test_loss_in_epoch) / len(test_loss_in_epoch),
-                                                            train_roc,
-                                                            test_roc,
-                                                            train_mrr,
-                                                            test_mrr,
-                                                            train_map,
-                                                            test_map))
+        print("epoch {}:\ttrain_loss {}".format(i, sum(train_loss_in_epoch) / len(train_loss_in_epoch)))
+        print("train roc:{}\t train map:{}\t train mrr:{}\t".format(train_roc, train_map, train_mrr))
+        # model.eval()
+        # is_first_batch = True
+        # for idx, batch in enumerate(tqdm(test_iter)):
+        #     if is_first_batch:
+        #         first_batch = batch
+        #         is_first_batch = False
+        #         if first_batch.batch_size != opts.batch_size:
+        #             continue
+        #     if batch.batch_size != opts.batch_size:
+        #         batch = fill_last_batch(first_batch, batch)
+        #
+        #     score = model(batch.question, batch.answer)
+        #     pred = torch.argmax(score, dim=1)
+        #     test_loss = criterion(score, batch.label)
+        #     test_loss_in_epoch.append(test_loss.item())
+        #
+        #     test_qid.extend(batch.qid.cpu().tolist())
+        #     test_aid.extend(batch.aid.cpu().tolist())
+        #     test_label.extend(batch.label.cpu().tolist())
+        #     test_pred.extend(pred.cpu().tolist())
+        #     test_score.extend(score[:, 1].cpu().tolist())
+        #
+        # test_record = pd.DataFrame({"qid": test_qid,
+        #                             "aid": test_aid,
+        #                             "label": test_label,
+        #                             "score": test_score,
+        #                             "pred": test_pred})
+        #
+        # test_roc = metrics.roc_auc_score(train_record['label'], train_record['score'])
+        # test_map, test_mrr = calculate_map_mrr(test_record, sort_by='score')
+        #
+        # print("epoch: {} \t train loss:{} \t test loss:{} \n"
+        #       "\t \t \t train roc:{} \t test roc: {} \n"
+        #       "\t \t \t train mrr:{} \t test mrr:{}\n"
+        #       "\t \t \t train map:{} \t test map:{}".format(i,
+        #                                                     sum(train_loss_in_epoch) / len(train_loss_in_epoch),
+        #                                                     sum(test_loss_in_epoch) / len(test_loss_in_epoch),
+        #                                                     train_roc,
+        #                                                     test_roc,
+        #                                                     train_mrr,
+        #                                                     test_mrr,
+        #                                                     train_map,
+        #                                                     test_map))
 
 
 if __name__ == '__main__':

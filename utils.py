@@ -132,6 +132,17 @@ def build_model_from_opts(opts, vocab):
                                opts.hidden_size,
                                opts.dropout,
                                opts.model_mode).to(device=opts.device)
+    elif opts.model_name == 'qa-nnqlm-cnnlstm':
+        model = NnqlmCnnBasedLstm(vocab,
+                                  opts.embedding_dim,
+                                  opts.batch_size,
+                                  opts.q_len,
+                                  opts.a_len,
+                                  opts.embedding_dim,
+                                  opts.n_filter,
+                                  opts.filter_size,
+                                  opts.padding,
+                                  opts.model_mode).to(device=opts.device)
     if opts.is_continue:
         fns = os.listdir(opts.checkpoint_dir)
     return model
@@ -142,10 +153,16 @@ def build_optimizer_from_opts(opts, model):
         return torch.optim.SGD(model.parameters(), lr=opts.learning_rate)
     elif opts.optimizer == 'adam':
         return torch.optim.Adam(model.parameters(), lr=opts.learning_rate)
+    elif opts.optimizer == 'rmsprop':
+        return torch.optim.RMSprop(model.parameters(), lr=opts.learning_rate)
+    elif opts.optimizer == 'adagrad':
+        return torch.optim.Adagrad(model.parameters(), lr=opts.learning_rate)
+
 
 def build_loss_from_opts(opts):
     if opts.loss == 'nll':
         return nn.NLLLoss()
+
 
 def calculate_map_mrr_0(dataframe):
     def get_ap_and_rr(df):
@@ -210,6 +227,25 @@ def calculate_acc(dataframe):
     return acc_sum / len(df_gs)
 
 
+def fill_last_batch(first_batch, cur_batch):
+    '''
+    batch attribute
+    qid, aid (B,)
+    question answer (B, L)
+    label (B,)
+    '''
+    to_fill_len = first_batch.batch_size - cur_batch.batch_size
+    filled_batch = first_batch
+
+    filled_batch.qid = torch.cat((cur_batch.qid, first_batch.qid[:to_fill_len]), dim=0)
+    filled_batch.aid = torch.cat((cur_batch.aid, first_batch.aid[:to_fill_len]), dim=0)
+    filled_batch.label = torch.cat((cur_batch.label, first_batch.label[:to_fill_len]), dim=0)
+    filled_batch.question = torch.cat((cur_batch.question, first_batch.question[:to_fill_len, :]), dim=0)
+    filled_batch.answer = torch.cat((cur_batch.answer, first_batch.answer[:to_fill_len, :]), dim=0)
+
+    return filled_batch
+
+
 def load_embedding(filename):
     embeddings = list()
     word2idx = dict()
@@ -235,6 +271,8 @@ if __name__ == '__main__':
     # processor.convert_raw_to_tsv()
     # processor.train_wv()
 
+    word_vectors = gensim.downloader.load('glove-wiki-gigaword-100')
+    word_vectors.save('./data/glove-wiki-gigaword-100')
     # word_vectors = KeyedVectors.load(join(path_dir, 'word2vec_100_dim'), mmap='r')
     # stoi = {word: idx for idx, word in enumerate(word_vectors.index2word)}
     # i2v = [torch.from_numpy(word_vectors[word].copy()) for idx, word in enumerate(word_vectors.index2word)]
