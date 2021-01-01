@@ -123,14 +123,16 @@ def build_model_from_opts(opts, vocab):
                              opts.embedding_dim,
                              opts.n_layers,
                              opts.hidden_size,
-                             opts.dropout,
+                             opts.dropout_lstm,
                              opts.model_mode).to(device=opts.device)
     elif opts.model_name == 'qa-lstm-cls':
         model = QaLstmForClass(vocab,
                                opts.embedding_dim,
                                opts.n_layers,
                                opts.hidden_size,
-                               opts.dropout,
+                               opts.dropout_lstm,
+                               opts.dropout_linear,
+                               opts.is_bi_directional,
                                opts.model_mode).to(device=opts.device)
     elif opts.model_name == 'qa-nnqlm-cnnlstm':
         model = NnqlmCnnBasedLstm(vocab,
@@ -142,6 +144,8 @@ def build_model_from_opts(opts, vocab):
                                   opts.n_filter,
                                   opts.filter_size,
                                   opts.padding,
+                                  opts.dropout_lstm,
+                                  opts.dropout_linear,
                                   opts.model_mode).to(device=opts.device)
     if opts.is_continue:
         fns = os.listdir(opts.checkpoint_dir)

@@ -20,7 +20,9 @@ def get_parser():
     basic_parser.add_argument('--optimizer', type=str, default='sgd')
     basic_parser.add_argument('--loss', type=str, default='nll')
     basic_parser.add_argument('--learning_rate', type=float, default=0.01)
-    basic_parser.add_argument('--dropout', type=float, default=0.4)
+    basic_parser.add_argument('--dropout_lstm', type=float, default=0.4)
+    basic_parser.add_argument('--dropout_linear', type=float, default=0.4)
+    basic_parser.add_argument('--dropout_cnn', type=float, default=0.4)
     basic_parser.add_argument('--margin', type=float, default=0.2)
 
     basic_parser.add_argument('--device', type=str, default="cuda:0")
@@ -30,6 +32,7 @@ def get_parser():
     # lstm_parser = argparse.ArgumentParser(parents=[basic_parser])
     basic_parser.add_argument('--hidden_size', type=int, default=128)
     basic_parser.add_argument('--n_layers', type=int, default=1)
+    basic_parser.add_argument('--is_bi_directional', action='store_true', default=False)
 
     # cnn_parser = argparse.ArgumentParser(parents=[basic_parser])
     basic_parser.add_argument('--filter_size', type=int, default=3)

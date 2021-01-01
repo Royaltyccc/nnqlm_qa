@@ -215,10 +215,10 @@ def train_class(opts):
 
     Q_TEXT.vocab = TEXT.vocab
     A_TEXT.vocab = TEXT.vocab
-
     print("building word vectors: done")
 
     model = build_model_from_opts(opts, TEXT.vocab)
+    print(model)
     optimizer = build_optimizer_from_opts(opts, model)
     criterion = build_loss_from_opts(opts)
 
@@ -241,9 +241,9 @@ def train_class(opts):
         model.train()
         is_first_batch = True
         for idx, batch in enumerate(tqdm(train_iter)):
-            if idx < 1270 and opts.dataset_fn == 'wiki':
+            if idx < 1200 and opts.dataset_fn == 'wiki':
                 continue
-            elif idx < 6600 and opts.dataset_fn == 'trec':
+            elif idx < 800 and opts.dataset_fn == 'trec':
                 continue
             if is_first_batch:
                 first_batch = batch
@@ -277,51 +277,52 @@ def train_class(opts):
         train_roc = metrics.roc_auc_score(train_record['label'], train_record['score'])
         train_map, train_mrr = calculate_map_mrr(train_record, sort_by='score')
 
-        print("epoch {}:\ttrain_loss {}".format(i, sum(train_loss_in_epoch) / len(train_loss_in_epoch)))
-        print("train roc:{}\t train map:{}\t train mrr:{}\t".format(train_roc, train_map, train_mrr))
-        # model.eval()
-        # is_first_batch = True
-        # for idx, batch in enumerate(tqdm(test_iter)):
-        #     if is_first_batch:
-        #         first_batch = batch
-        #         is_first_batch = False
-        #         if first_batch.batch_size != opts.batch_size:
-        #             continue
-        #     if batch.batch_size != opts.batch_size:
-        #         batch = fill_last_batch(first_batch, batch)
-        #
-        #     score = model(batch.question, batch.answer)
-        #     pred = torch.argmax(score, dim=1)
-        #     test_loss = criterion(score, batch.label)
-        #     test_loss_in_epoch.append(test_loss.item())
-        #
-        #     test_qid.extend(batch.qid.cpu().tolist())
-        #     test_aid.extend(batch.aid.cpu().tolist())
-        #     test_label.extend(batch.label.cpu().tolist())
-        #     test_pred.extend(pred.cpu().tolist())
-        #     test_score.extend(score[:, 1].cpu().tolist())
-        #
-        # test_record = pd.DataFrame({"qid": test_qid,
-        #                             "aid": test_aid,
-        #                             "label": test_label,
-        #                             "score": test_score,
-        #                             "pred": test_pred})
-        #
-        # test_roc = metrics.roc_auc_score(train_record['label'], train_record['score'])
-        # test_map, test_mrr = calculate_map_mrr(test_record, sort_by='score')
-        #
-        # print("epoch: {} \t train loss:{} \t test loss:{} \n"
-        #       "\t \t \t train roc:{} \t test roc: {} \n"
-        #       "\t \t \t train mrr:{} \t test mrr:{}\n"
-        #       "\t \t \t train map:{} \t test map:{}".format(i,
-        #                                                     sum(train_loss_in_epoch) / len(train_loss_in_epoch),
-        #                                                     sum(test_loss_in_epoch) / len(test_loss_in_epoch),
-        #                                                     train_roc,
-        #                                                     test_roc,
-        #                                                     train_mrr,
-        #                                                     test_mrr,
-        #                                                     train_map,
-        #                                                     test_map))
+        # print("epoch {}:\ttrain_loss {}".format(i, sum(train_loss_in_epoch) / len(train_loss_in_epoch)))
+        # print("train roc:{}\t train map:{}\t train mrr:{}\t".format(train_roc, train_map, train_mrr))
+
+        with torch.no_grad():
+            is_first_batch = True
+            for idx, batch in enumerate(tqdm(test_iter)):
+                if is_first_batch:
+                    first_batch = batch
+                    is_first_batch = False
+                    if first_batch.batch_size != opts.batch_size:
+                        continue
+                if batch.batch_size != opts.batch_size:
+                    batch = fill_last_batch(first_batch, batch)
+
+                score = model(batch.question, batch.answer)
+                pred = torch.argmax(score, dim=1)
+                test_loss = criterion(score, batch.label)
+                test_loss_in_epoch.append(test_loss.item())
+
+                test_qid.extend(batch.qid.cpu().tolist())
+                test_aid.extend(batch.aid.cpu().tolist())
+                test_label.extend(batch.label.cpu().tolist())
+                test_pred.extend(pred.cpu().tolist())
+                test_score.extend(score[:, 1].cpu().tolist())
+
+            test_record = pd.DataFrame({"qid": test_qid,
+                                        "aid": test_aid,
+                                        "label": test_label,
+                                        "score": test_score,
+                                        "pred": test_pred})
+
+            test_roc = metrics.roc_auc_score(train_record['label'], train_record['score'])
+            test_map, test_mrr = calculate_map_mrr(test_record, sort_by='score')
+
+            print("epoch: {} \t train loss:{} \t test loss:{} \n"
+                  "\t \t \t train roc:{} \t test roc: {} \n"
+                  "\t \t \t train mrr:{} \t test mrr:{}\n"
+                  "\t \t \t train map:{} \t test map:{}".format(i,
+                                                                sum(train_loss_in_epoch) / len(train_loss_in_epoch),
+                                                                sum(test_loss_in_epoch) / len(test_loss_in_epoch),
+                                                                train_roc,
+                                                                test_roc,
+                                                                train_mrr,
+                                                                test_mrr,
+                                                                train_map,
+                                                                test_map))
 
 
 if __name__ == '__main__':

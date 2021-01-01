@@ -51,7 +51,7 @@ class QaLstmForSim(nn.Module):
 
 
 class QaLstmForClass(nn.Module):
-    def __init__(self, vocab, embedding_dim, n_layers, hidden_size, dropout, mode='max'):
+    def __init__(self, vocab, embedding_dim, n_layers, hidden_size, dropout_lstm, dropout_linear, is_bi, mode='max'):
         '''
         :param vocab: pytorch vocab class
         :param embedding_dim:
@@ -63,19 +63,27 @@ class QaLstmForClass(nn.Module):
         super().__init__()
         self.mode = mode
         self.hidden_size = hidden_size
+        self.is_bi = is_bi
+
         self.embeddings = nn.Embedding(len(vocab), embedding_dim)
         self.embeddings.weight.data.copy_(vocab.vectors)
-        self.bilstm = nn.LSTM(embedding_dim, hidden_size, n_layers, batch_first=True, dropout=dropout,
-                              bidirectional=True)
-        self.linear = nn.Linear(self.hidden_size * 4, 2)
+        if is_bi:
+            self.lstm = nn.LSTM(embedding_dim, hidden_size, n_layers, batch_first=True, dropout=dropout_lstm,
+                                bidirectional=True)
+            self.linear = nn.Sequential(nn.Linear(self.hidden_size * 4, 2),
+                                        nn.Dropout(dropout_linear))
+        else:
+            self.lstm = nn.LSTM(embedding_dim, hidden_size, n_layers, batch_first=True, dropout=dropout_lstm)
+            self.linear = nn.Sequential(nn.Linear(self.hidden_size * 2, 2),
+                                        nn.Dropout(dropout_linear))
         self.logsoftmax = nn.LogSoftmax(dim=1)
 
     def forward(self, q, a):
         # (B, L)
         q = self.embeddings(q)  # (B, L, D)
         a = self.embeddings(a)  # (B, L, D)
-        q_o, _ = self.bilstm(q)  # (B, L, 2*H)
-        a_o, _ = self.bilstm(a)  # (B, L, 2*H)
+        q_o, _ = self.lstm(q)  # (B, L, 2*H)
+        a_o, _ = self.lstm(a)  # (B, L, 2*H)
 
         # (B, 2*H)
         if self.mode == 'max':
@@ -142,26 +150,30 @@ class CnnBasedLstmCell(nn.Module):
         :param padding:
         '''
         super().__init__()
+        self.num_filter = num_filter
         self.forget_gate = nn.Sequential(nn.Conv2d(in_channels=1,
-                                                   out_channels=1,
+                                                   out_channels=num_filter,
                                                    kernel_size=conv_ks,
                                                    stride=(2, 1),
                                                    padding=padding))
         self.input_gate = nn.Sequential(nn.Conv2d(in_channels=1,
-                                                  out_channels=1,
+                                                  out_channels=num_filter,
                                                   kernel_size=conv_ks,
                                                   stride=(2, 1),
                                                   padding=padding))
         self.candidate_cell = nn.Sequential(nn.Conv2d(in_channels=1,
-                                                      out_channels=1,
+                                                      out_channels=num_filter,
                                                       kernel_size=conv_ks,
                                                       stride=(2, 1),
                                                       padding=padding))
         self.output_gate = nn.Sequential(nn.Conv2d(in_channels=1,
-                                                   out_channels=1,
+                                                   out_channels=num_filter,
                                                    kernel_size=conv_ks,
                                                    stride=(2, 1),
                                                    padding=padding))
+
+        self.linear_c = nn.Linear(self.num_filter, 1)
+        self.linear_h = nn.Linear(self.num_filter, 1)
 
     def forward(self, x, pre_h, pre_c):
         '''
@@ -173,13 +185,16 @@ class CnnBasedLstmCell(nn.Module):
             c: (B, 1, D, D)
         '''
         input = torch.cat((x, pre_h), dim=2)  # (B, 1, 2*D, D)
-        fg = torch.sigmoid(self.forget_gate(input))  # (B, 1, D, D)
+        fg = torch.sigmoid(self.forget_gate(input))  # (B, F, D, D)
         ig = torch.sigmoid(self.input_gate(input))
         og = torch.sigmoid(self.output_gate(input))
         cs = torch.tanh(self.candidate_cell(input))
 
-        c = fg * pre_c + ig * cs
+        c = fg * pre_c + ig * cs  # (B, F, D, D)
         h = og * torch.tanh(c)
+
+        c = self.linear_c(c.permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
+        h = self.linear_h(h.permute(0, 3, 2, 1)).permute(0, 3, 2, 1)
         return h, c
 
 
@@ -207,7 +222,7 @@ class CnnBasedLstm(nn.Module):
 
 class NnqlmCnnBasedLstm(nn.Module):
     def __init__(self, vocab, embedding_dim, batch_size, q_len, a_len, word_dim, num_filter, conv_ks, padding,
-                 mode='max'):
+                 dropout_lstm, dropout_linear, mode='max'):
         super().__init__()
         self.hidden_size = word_dim
         self.mode = mode
@@ -219,8 +234,8 @@ class NnqlmCnnBasedLstm(nn.Module):
         # self.q_cbl = CnnBasedLstm(num_filter, conv_ks, padding)
         # self.a_cbl = CnnBasedLstm(num_filter, conv_ks, padding)
         self.cbl = CnnBasedLstm(num_filter, conv_ks, padding)
-        self.hidden2label_score = nn.Sequential(nn.Linear(2 * self.hidden_size * self.hidden_size, self.hidden_size),
-                                                nn.Linear(self.hidden_size, 2))
+        self.hidden2label_score = nn.Sequential(nn.Linear(2 * self.hidden_size * self.hidden_size, 2),
+                                                nn.Dropout(dropout_linear))
         self.logsoftmax = nn.LogSoftmax(dim=1)
 
     def forward(self, q, a):
