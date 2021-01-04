@@ -222,6 +222,7 @@ def train_class(opts):
     optimizer = build_optimizer_from_opts(opts, model)
     criterion = build_loss_from_opts(opts)
 
+    best_map = 0
     for i in range(opts.epochs):
         train_loss_in_epoch = []
         test_loss_in_epoch = []
@@ -241,9 +242,9 @@ def train_class(opts):
         model.train()
         is_first_batch = True
         for idx, batch in enumerate(tqdm(train_iter)):
-            if idx < 1200 and opts.dataset_fn == 'wiki':
+            if idx < 1200 and opts.dataset_fn == 'wiki' and opts.is_jump:
                 continue
-            elif idx < 800 and opts.dataset_fn == 'trec':
+            elif idx < 3300 and opts.dataset_fn == 'trec' and opts.is_jump:
                 continue
             if is_first_batch:
                 first_batch = batch
@@ -277,10 +278,14 @@ def train_class(opts):
         train_roc = metrics.roc_auc_score(train_record['label'], train_record['score'])
         train_map, train_mrr = calculate_map_mrr(train_record, sort_by='score')
 
-        # print("epoch {}:\ttrain_loss {}".format(i, sum(train_loss_in_epoch) / len(train_loss_in_epoch)))
+        train_loss = sum(train_loss_in_epoch) / len(train_loss_in_epoch)
+        # print("epoch {}:\ttrain_loss {}".format(i, train_loss))
         # print("train roc:{}\t train map:{}\t train mrr:{}\t".format(train_roc, train_map, train_mrr))
 
+        model.eval()
         with torch.no_grad():
+            if opts.is_jump:
+                continue
             is_first_batch = True
             for idx, batch in enumerate(tqdm(test_iter)):
                 if is_first_batch:
@@ -308,21 +313,36 @@ def train_class(opts):
                                         "score": test_score,
                                         "pred": test_pred})
 
-            test_roc = metrics.roc_auc_score(train_record['label'], train_record['score'])
+            test_roc = metrics.roc_auc_score(test_record['label'], test_record['score'])
             test_map, test_mrr = calculate_map_mrr(test_record, sort_by='score')
 
+            test_loss = sum(test_loss_in_epoch) / len(test_loss_in_epoch)
             print("epoch: {} \t train loss:{} \t test loss:{} \n"
                   "\t \t \t train roc:{} \t test roc: {} \n"
                   "\t \t \t train mrr:{} \t test mrr:{}\n"
                   "\t \t \t train map:{} \t test map:{}".format(i,
-                                                                sum(train_loss_in_epoch) / len(train_loss_in_epoch),
-                                                                sum(test_loss_in_epoch) / len(test_loss_in_epoch),
+                                                                train_loss,
+                                                                test_loss,
                                                                 train_roc,
                                                                 test_roc,
                                                                 train_mrr,
                                                                 test_mrr,
                                                                 train_map,
                                                                 test_map))
+            if test_map > best_map:
+                best_map = test_map
+                save_path = join(opts.checkpoint_dir,
+                                 '{}_{}_{}_map_{:.4f}'.format(opts.model_name,
+                                                              opts.dataset_fn.replace('/', '_'),
+                                                              i,
+                                                              best_map))
+                torch.save({"opts": opts,
+                            "model_state_dict": model.state_dict(),
+                            'optimizer_state_dict': optimizer.state_dict(),
+                            "train_loss": train_loss,
+                            "test_loss": test_loss,
+                            "train_metric": [train_roc, train_map, train_mrr],
+                            "test_metric": [test_roc, test_map, test_mrr]}, save_path)
 
 
 if __name__ == '__main__':

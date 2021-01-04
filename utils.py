@@ -121,14 +121,14 @@ def build_model_from_opts(opts, vocab):
     if opts.model_name == 'qa-lstm-sim':
         model = QaLstmForSim(vocab,
                              opts.embedding_dim,
-                             opts.n_layers,
+                             opts.n_layer,
                              opts.hidden_size,
                              opts.dropout_lstm,
                              opts.model_mode).to(device=opts.device)
     elif opts.model_name == 'qa-lstm-cls':
         model = QaLstmForClass(vocab,
                                opts.embedding_dim,
-                               opts.n_layers,
+                               opts.n_layer,
                                opts.hidden_size,
                                opts.dropout_lstm,
                                opts.dropout_linear,
@@ -141,6 +141,7 @@ def build_model_from_opts(opts, vocab):
                                   opts.q_len,
                                   opts.a_len,
                                   opts.embedding_dim,
+                                  opts.n_layer,
                                   opts.n_filter,
                                   opts.filter_size,
                                   opts.padding,
@@ -269,14 +270,19 @@ def load_embedding(filename):
     return embeddings, word2idx
 
 
+def get_mean(s):
+    num_list = [float(i) for i in s.split()]
+    print('{:.4f}'.format(sum(num_list) / float(len(num_list))))
+
+
 if __name__ == '__main__':
     path_dir = './data/insuranceQA/V1'
     processor = Processor(path_dir)
     # processor.convert_raw_to_tsv()
     # processor.train_wv()
 
-    word_vectors = gensim.downloader.load('glove-wiki-gigaword-100')
-    word_vectors.save('./data/glove-wiki-gigaword-100')
+    # word_vectors = gensim.downloader.load('glove-wiki-gigaword-100')
+    # word_vectors.save('./data/glove-wiki-gigaword-100')
     # word_vectors = KeyedVectors.load(join(path_dir, 'word2vec_100_dim'), mmap='r')
     # stoi = {word: idx for idx, word in enumerate(word_vectors.index2word)}
     # i2v = [torch.from_numpy(word_vectors[word].copy()) for idx, word in enumerate(word_vectors.index2word)]

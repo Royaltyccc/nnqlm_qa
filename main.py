@@ -31,7 +31,7 @@ def get_parser():
 
     # lstm_parser = argparse.ArgumentParser(parents=[basic_parser])
     basic_parser.add_argument('--hidden_size', type=int, default=128)
-    basic_parser.add_argument('--n_layers', type=int, default=1)
+    basic_parser.add_argument('--n_layer', type=int, default=1)
     basic_parser.add_argument('--is_bi_directional', action='store_true', default=False)
 
     # cnn_parser = argparse.ArgumentParser(parents=[basic_parser])
@@ -39,6 +39,7 @@ def get_parser():
     basic_parser.add_argument('--n_filter', type=int, default=5)
     basic_parser.add_argument('--padding', type=int, default=1)
 
+    basic_parser.add_argument('--is_jump', action='store_true', default=False)
     return basic_parser
 
 
