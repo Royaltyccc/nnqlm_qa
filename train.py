@@ -242,7 +242,7 @@ def train_class(opts):
         model.train()
         is_first_batch = True
         for idx, batch in enumerate(tqdm(train_iter)):
-            if idx < 1200 and opts.dataset_fn == 'wiki' and opts.is_jump:
+            if idx < 300 and opts.dataset_fn == 'wiki' and opts.is_jump:
                 continue
             elif idx < 3300 and opts.dataset_fn == 'trec' and opts.is_jump:
                 continue

@@ -125,6 +125,15 @@ def build_model_from_opts(opts, vocab):
                              opts.hidden_size,
                              opts.dropout_lstm,
                              opts.model_mode).to(device=opts.device)
+    elif opts.model_name == 'qa-rnn-cls':
+        model = QaRnnForClass(vocab,
+                              opts.embedding_dim,
+                              opts.n_layer,
+                              opts.hidden_size,
+                              opts.dropout_lstm,
+                              opts.dropout_linear,
+                              opts.is_bi_directional,
+                              opts.model_mode).to(device=opts.device)
     elif opts.model_name == 'qa-lstm-cls':
         model = QaLstmForClass(vocab,
                                opts.embedding_dim,
@@ -134,20 +143,47 @@ def build_model_from_opts(opts, vocab):
                                opts.dropout_linear,
                                opts.is_bi_directional,
                                opts.model_mode).to(device=opts.device)
+    elif opts.model_name == 'qa-nnqlm-cnnrnn':
+        model = NnqlmCnnBasedRNN(vocab,
+                                 opts.embedding_dim,
+                                 opts.batch_size,
+                                 opts.q_len,
+                                 opts.a_len,
+                                 opts.n_layer,
+                                 opts.n_filter,
+                                 opts.filter_size,
+                                 opts.padding,
+                                 opts.dropout_lstm,
+                                 opts.dropout_linear,
+                                 opts.is_bi_directional,
+                                 opts.model_mode).to(device=opts.device)
     elif opts.model_name == 'qa-nnqlm-cnnlstm':
         model = NnqlmCnnBasedLstm(vocab,
                                   opts.embedding_dim,
                                   opts.batch_size,
                                   opts.q_len,
                                   opts.a_len,
-                                  opts.embedding_dim,
                                   opts.n_layer,
                                   opts.n_filter,
                                   opts.filter_size,
                                   opts.padding,
                                   opts.dropout_lstm,
                                   opts.dropout_linear,
-                                  opts.model_mode).to(device=opts.device)
+                                  opts.is_bi_directional,
+                                  opts.model_mode)
+        print(sum(p.numel() for p in model.parameters()))
+        print(sum(p.numel() for p in model.parameters() if p.requires_grad))
+        model = model.to(device=opts.device)
+
+    elif opts.model_name == 'qa-rnn-cls':
+        model = QaRnnForClass(vocab,
+                              opts.embedding_dim,
+                              opts.n_layer,
+                              opts.hidden_size,
+                              opts.dropout_lstm,
+                              opts.dropout_linear,
+                              opts.is_bi_directional,
+                              opts.model_mode).to(device=opts.device)
     if opts.is_continue:
         fns = os.listdir(opts.checkpoint_dir)
     return model
@@ -295,4 +331,7 @@ if __name__ == '__main__':
     # acc = calculate_acc(temp)
     # print(acc)
 
+    print(get_mean('''0.6553
+0.6592
+0.6495'''))
     pass
