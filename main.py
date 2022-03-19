@@ -36,7 +36,7 @@ def get_parser():
 
     # cnn_parser = argparse.ArgumentParser(parents=[basic_parser])
     basic_parser.add_argument('--filter_size', type=int, default=3)
-    basic_parser.add_argument('--n_filter', type=int, default=5)
+    basic_parser.add_argument('--n_filter', type=int, default=1)
     basic_parser.add_argument('--padding', type=int, default=1)
 
     basic_parser.add_argument('--is_jump', action='store_true', default=False)
